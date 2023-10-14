@@ -1,4 +1,6 @@
 import json
+import tkinter
+
 import matplotlib
 
 import numexpr as ne
@@ -15,7 +17,6 @@ from matplotlib.backends.backend_tkagg import (FigureCanvasTkAgg,
 
 matplotlib.use('TkAgg')
 
-
 # class for entries storage (класс для хранения текстовых полей)
 class Entries:
     def __init__(self):
@@ -24,6 +25,9 @@ class Entries:
 
     def set_parent_window(self, parent_window):
         self.parent_window = parent_window
+
+    def get_active_entry_index(self):
+        return tkinter.Tk.focus_get(self.parent_window)
 
     # adding of new entry (добавление нового текстового поля)
     def add_entry(self):
@@ -36,6 +40,29 @@ class Entries:
             plot_button.pack_forget()
         self.parent_window.add_button('plot', 'Plot', 'plot', hot_key='<Return>')
         self.entries_list.append(new_entry)
+
+    def remove_entry(self):
+        def is_not_blank(s):
+            return bool(s and not s.isspace())
+
+        a = self.get_active_entry_index()
+        if len(self.entries_list) < 1:
+            return
+        if self.entries_list.__contains__(a):
+            if is_not_blank(a.get()):
+                modWindow = ModalWindow(self.parent_window, title='Попытка удаления непустого окна',
+                    labeltext='Удалено непустое текстовое поле')
+                ok_button = Button(master=modWindow.top, text='OK', command=modWindow.cancel)
+                modWindow.add_button(ok_button)
+
+            b = a
+            self.entries_list.remove(a)
+            a.destroy()
+            plot_button = self.parent_window.get_button_by_name('plot')
+            if plot_button:
+                plot_button.pack_forget()
+            self.parent_window.add_button('plot', 'Plot', 'plot', hot_key='<Return>')
+            return b
 
 
 # class for plotting (класс для построения графиков)
@@ -96,6 +123,7 @@ class Commands:
         self._state = Commands.State()
         self.__empty_entry_counter = 0
         self.parent_window = None
+        self.windowexists = False
 
     def set_parent_window(self, parent_window):
         self.parent_window = parent_window
@@ -109,6 +137,7 @@ class Commands:
     def __forget_canvas(self):
         if self.__figure_canvas is not None:
             self.__figure_canvas.get_tk_widget().pack_forget()
+            self.windowexists = False
 
     def __forget_navigation(self):
         if self.__navigation_toolbar is not None:
@@ -144,6 +173,7 @@ class Commands:
         self.__forget_navigation()
         self.__navigation_toolbar = NavigationToolbar2Tk(self.__figure_canvas, self.parent_window)
         self.__figure_canvas.get_tk_widget().pack(side=TOP, fill=BOTH, expand=1)
+        self.windowexists = True
         plot_button = self.parent_window.get_button_by_name('plot')
         if plot_button:
             plot_button.pack_forget()
@@ -152,6 +182,14 @@ class Commands:
         self.__forget_canvas()
         self.__forget_navigation()
         self.parent_window.entries.add_entry()
+
+    def remove_func(self, *args, **kwargs):
+        removedval = self.parent_window.entries.remove_entry()
+        if self.__figure_canvas is not None:
+            if self.windowexists:
+                self.__forget_canvas()
+                self.__forget_navigation()
+                self.plot()
 
     def save_as(self):
         self._state.save_state()
@@ -247,11 +285,13 @@ if __name__ == "__main__":
     # command's registration (регистрация команд)
     commands_main.add_command('plot', commands_main.plot)
     commands_main.add_command('add_func', commands_main.add_func)
+    commands_main.add_command('remove_func', commands_main.remove_func)
     commands_main.add_command('save_as', commands_main.save_as)
     # init app (создаем экземпляр приложения)
     app = App(buttons_main, plotter_main, commands_main, entries_main)
     # init add func button (добавляем кнопку добавления новой функции)
     app.add_button('add_func', 'Добавить функцию', 'add_func', hot_key='<Control-a>')
+    app.add_button('remove_func', 'Удалить функцию', 'remove_func', hot_key='<Control-b>')
     # init first entry (создаем первое поле ввода)
     entries_main.add_entry()
     app.create_menu()
